@@ -2,6 +2,8 @@
 
 # if not present, add package geoip-database with apt install geoip-database
 # source https://forum.yunohost.org/t/tuto-bloquer-les-requetes-selon-le-pays
+# cd /etc/yunohost/hooks.d/conf_regen
+# wget 
 ##############################################
 #Beware, i'm not sure this command is universal. You must test it before. If not, you can find the result with the command ip route, this one must be like 192.168.0.0/24 or similar. Then replace the variable $network_address with it.
 #Attention, je ne suis pas certain que cette commande est universelle. Vous devez la tester au préalable. Si ce n'est pas le cas, vous pouvez trouver la réponse avec la commande ip route, celle-ci doit être de la forme 192.168.0.0/24 ou similaire. Remplacez alors la variable $network_address par celle-ci.
