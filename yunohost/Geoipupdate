@@ -1,0 +1,22 @@
+#!/bin/bash
+
+# A placer dans /etc/cron.weekly/Geoipupdate
+# Voir https://forum.yunohost.org/t/tuto-bloquer-les-requetes-selon-le-pays/9947
+
+
+maj_geoip () {
+v6Test=`grep 'inet6 [23]' <(ip -6 addr)` #Test si le serveur supporte l'IPv6
+
+cd /usr/share/GeoIP
+if [ "$v6Test" != "" ]; then
+        wget https://dl.miyuru.lk/geoip/maxmind/country/maxmind.dat.gz -O GeoIP.dat.gz #IPv4+IPv6
+else
+        wget https://mailfud.org/geoip-legacy/GeoIP.dat.gz #IPv4
+fi
+gunzip -f GeoIP.dat.gz
+}
+
+last=/usr/local/etc/last
+update=$(sed -n 's,.*<b>\(.*\)</b>,\1,p' <(curl -s https://mailfud.org/geoip-legacy/ | grep 'Latest update'))
+[[ "$(<$last)" != "$update" ]] && (echo "$update" > "$last";maj_geoip)
+exit 0
