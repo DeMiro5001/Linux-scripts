@@ -1,14 +1,6 @@
 #!/bin/bash
 
 # if not present, add package geoip-database with apt install geoip-database
-#---
-# source https://forum.yunohost.org/t/tuto-bloquer-les-requetes-selon-le-pays
-# cd /etc/yunohost/hooks.d/conf_regen
-# wget https://raw.githubusercontent.com/jarod5001/Linux-scripts/main/yunohost/18-nginx_geoip
-# sudo nano 18-nginx_geoip
-# change the country code
-# regenarate nginx config : yunohost tools regen-conf nginx --force 
-#---
 ##############################################
 #Beware, i'm not sure this command is universal. You must test it before. If not, you can find the result with the command ip route, this one must be like 192.168.0.0/24 or similar. Then replace the variable $network_address with it.
 #Attention, je ne suis pas certain que cette commande est universelle. Vous devez la tester au préalable. Si ce n'est pas le cas, vous pouvez trouver la réponse avec la commande ip route, celle-ci doit être de la forme 192.168.0.0/24 ou similaire. Remplacez alors la variable $network_address par celle-ci.
@@ -32,13 +24,10 @@ map \$geoip_country_code \$allowed_country {
   default no;
   # France
   FR yes;
-  # Italie
-  #IT yes;
 }
 
 geo \$lan-ip {
   default no;
-  $network_address yes;
   127.0.0.1 yes;
 }" > $nginx_country_conf
 
