@@ -1,4 +1,5 @@
 Run these commands
+
 ```bash
 # Change user to root and change current working dir to yunohost hooks
 sudo -i
@@ -10,7 +11,9 @@ cd /etc/yunohost/hooks.d/
 mkdir post_domain_add
 nano post_domain_add/01-post_domain_add
 ```
+
 paste, save and exit
+
 ```bash
 #!/bin/bash
 source /usr/share/yunohost/helpers
@@ -24,7 +27,9 @@ curl -X POST "https://__GOTIFYPATH__/message?token=__TOKEN__" -F "title=Yuno Hom
 mkdir post_domain_remove
 nano post_domain_remove/01-post_domain_remove
 ```
+
 paste, save and exit
+
 ```bash
 #!/bin/bash
 source /usr/share/yunohost/helpers
@@ -38,7 +43,9 @@ curl -X POST "https://__GOTIFYPATH__/message?token=__TOKEN__" -F "title=Yuno Hom
 mkdir post_cert_update
 nano post_cert_update/01-post_cert_update
 ```
+
 paste, save and exit
+
 ```bash
 #!/bin/bash
 source /usr/share/yunohost/helpers
@@ -52,7 +59,9 @@ curl -X POST "https://__GOTIFYPATH__/message?token=__TOKEN__" -F "title=Yuno Hom
 mkdir backup
 nano backup/01-backup
 ```
+
 paste, save and exit
+
 ```bash
 #!/bin/bash
 source /usr/share/yunohost/helpers
@@ -68,7 +77,9 @@ curl -X POST "https://__GOTIFYPATH__/message?token=__TOKEN__" -F "title=Yuno Hom
 mkdir restore
 nano restore/01-restore
 ```
+
 paste, save and exit
+
 ```bash
 #!/bin/bash
 source /usr/share/yunohost/helpers
@@ -84,7 +95,9 @@ curl -X POST "https://__GOTIFYPATH__/message?token=__TOKEN__" -F "title=Yuno Hom
 mkdir post_app_install
 nano post_app_install/01-post_app_install
 ```
+
 paste, save and exit
+
 ```bash
 #!/bin/bash
 source /usr/share/yunohost/helpers
@@ -100,7 +113,9 @@ curl -X POST "https://__GOTIFYPATH__/message?token=__TOKEN__" -F "title=Yuno Hom
 mkdir post_app_remove
 nano post_app_remove/01-post_app_remove
 ```
+
 paste, save and exit
+
 ```bash
 #!/bin/bash
 source /usr/share/yunohost/helpers
@@ -116,7 +131,9 @@ curl -X POST "https://__GOTIFYPATH__/message?token=__TOKEN__" -F "title=Yuno Hom
 mkdir post_app_upgrade
 nano post_app_upgrade/01-post_app_upgrade
 ```
+
 paste, save and exit
+
 ```bash
 #!/bin/bash
 source /usr/share/yunohost/helpers
@@ -132,7 +149,9 @@ curl -X POST "https://__GOTIFYPATH__/message?token=__TOKEN__" -F "title=Yuno Hom
 # Get notified when a successful ssh connection is established
 nano /etc/profile.d/gotify_ssh_login.sh
 ```
+
 paste, save and exit
+
 ```bash
 curl -X POST "https://__GOTIFYPATH__/message?token=__TOKEN__" -F "title=Yuno Server - SSH login" -F "message=$USER connected from $SSH_CLIENT" > /dev/null 2>&1" > 
 ```
