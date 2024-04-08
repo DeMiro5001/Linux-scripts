@@ -187,7 +187,7 @@ We'll create a bash script that checks disk space and sends a notification via g
   * `/dev/sdX`: Replace this with the actual mount point of your disk drive (you can check with the df command). 
   * `<YOUR_GOTIFY_URL>`: Replace this with your gotify server URL, including the port (e.g., http://localhost:8080).
   * `<YOUR_GOTIFY_ACCESS_TOKEN>`: Replace this with your gotify access token (you can find this in your gotify settings).
-  *`<THRESHOLD>`: Set your desired threshold for free disk space in MB (e.g., 10240 for 10GB).
+  * `<THRESHOLD>`: Set your desired threshold for free disk space in MB (e.g., 10240 for 10GB).
 
 ```bash
 #!/bin/bash
