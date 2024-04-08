@@ -175,3 +175,76 @@ paste, save and exit
 ```bash
 curl -X POST "https://__GOTIFYPATH__/message?token=__TOKEN__" -F "title=Yuno Server - SSH login" -F "message=$USER connected from $SSH_CLIENT" > /dev/null 2>&1" > 
 ```
+
+11. Set up notifications for low disk space on Linux server using gotify:
+
+11.1. Script Creation:
+
+We'll create a bash script that checks disk space and sends a notification via gotify if it falls below a threshold.
+
+* Create a new file (e.g., check_disk_space.sh) using a text editor.
+* Add the following content to the script, replacing the following:
+  * `/dev/sdX`: Replace this with the actual mount point of your disk drive (you can check with the df command). 
+  * `<YOUR_GOTIFY_URL>`: Replace this with your gotify server URL, including the port (e.g., http://localhost:8080).
+  * `<YOUR_GOTIFY_ACCESS_TOKEN>`: Replace this with your gotify access token (you can find this in your gotify settings).
+  *`<THRESHOLD>`: Set your desired threshold for free disk space in MB (e.g., 10240 for 10GB).
+
+```bash
+#!/bin/bash
+
+# Get free disk space in MB
+FREE_SPACE=$(df -m /dev/sdX | awk '$2 > 0 {print $4}')
+
+# Check if free space is below threshold
+if [[ $FREE_SPACE -lt <THRESHOLD> ]]; then
+  # Prepare message content
+  MESSAGE="Server running low on disk space! Free space on /dev/sdX: $FREE_SPACE MB"
+
+  # Send notification via gotify with curl
+  curl -X POST "<YOUR_GOTIFY_URL>/message" \
+    -H "Content-Type: application/json" \
+    -d "{\"title\": \"Disk Space Alert\", \"message\": \"$MESSAGE\"}" \
+    -H "Authorization: Token <YOUR_GOTIFY_ACCESS_TOKEN>"
+fi
+
+```
+
+11.2. Make the script executable:
+
+* Open a terminal and navigate to the directory where you saved the script.
+* Run the following command:
+
+```bash
+chmod +x check_disk_space.sh
+```
+
+11.3. Schedule the script (cron):
+
+* Open your crontab for editing:
+
+```bash
+crontab -e
+```
+* Add a new line following the format:
+
+```
+MINUTE HOUR DAY_OF_MONTH MONTH DAY_OF_WEEK COMMAND
+```
+
+**Here's an example to run the script every hour:**
+
+```
+0 * * * * /path/to/check_disk_space.sh
+```
+* Replace `/path/to/check_disk_space.sh` with the actual path to your script.
+
+11.4. Save and Close:
+
+* Save the crontab after making edits.
+* This will now run your script every hour, checking disk space and sending a notification via gotify if it's below the threshold. 
+
+11.5. The recommended location for your custom scripts on a Linux server depends on a few factors:
+
+Who will use the script?
+* Personal Use: If the script is only for you and won't be used by other users, a good option is `~/.local/bin`. This directory is within your home directory (~) and is included in your PATH by default on most systems after logging in. This makes the script accessible from anywhere in your home directory without specifying the full path. 
+* System-wide Use: If the script needs to be available to all users, a common location is `/usr/local/bin`. This directory is typically included in the system-wide PATH, allowing all users to execute the script by name from the command line.
