@@ -83,9 +83,9 @@ sudo apt-get install virtualbox --install-suggests --install-recommends -y
 
 # Install vncviewer
 
-wget https://downloads.realvnc.com/download/file/viewer.files/VNC-Viewer-7.6.1-Linux-x64.deb
-sudo dpkg -i VNC-Viewer-7.6.1-Linux-x64.deb
-rm VNC-Viewer-7.6.1-Linux-x64.deb
+wget https://downloads.realvnc.com/download/file/viewer.files/VNC-Viewer-7.13.1-Linux-x64.deb
+sudo dpkg -i VNC-Viewer-7.13.1-Linux-x64.deb
+rm VNC-Viewer-7.13.1-Linux-x64.deb
 
 # Install php
 
@@ -161,3 +161,10 @@ printf 'deb [signed-by=/usr/share/keyrings/ubuntuzilla.gpg] https://downloads.so
 sudo apt update
 sudo apt install seamonkey-mozilla-build
 
+# Install flathub
+
+sudo apt install flatpak -y
+flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+
+# Install Speech Note https://github.com/mkiol/dsnote
+flatpak install flathub net.mkiol.SpeechNote
