@@ -1,0 +1,136 @@
+#!/bin/bash
+
+# Place this file in /etc/cron.daily and make it executable
+# Configuration
+RECIPIENT="root"
+SUBJECT="YunoHost Updates Available - $(date +'%Y-%m-%d')"
+
+# Run update check
+OUTPUT=$(yunohost tools update --json 2>&1)
+JSON=$(echo "$OUTPUT" | grep -E '^\{"system"|^\{' | head -1)
+
+# Verify JSON
+if ! jq -e . >/dev/null 2>&1 <<<"$JSON"; then
+    echo "Error parsing JSON output" | mail -s "YunoHost Update Error" "$RECIPIENT"
+    exit 1
+fi
+
+# Check for updates
+SYSTEM_UPDATES=$(jq -e '.system | length > 0' <<<"$JSON")
+APP_UPDATES=$(jq -e '[.apps[] | select(.upgradable == "yes")] | length > 0' <<<"$JSON")
+YUNOHOST_UPDATE=$(jq -e '.important_yunohost_upgrade == true' <<<"$JSON")
+
+# Exit if no updates
+if ! $SYSTEM_UPDATES && ! $APP_UPDATES && ! $YUNOHOST_UPDATE; then
+    exit 0
+fi
+
+# Generate HTML content
+HTML_HEADER='
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  * { font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+  body { background-color: #f7f9fc; margin: 0; padding: 20px; }
+  .container { max-width: 650px; margin: 0 auto; }
+  .card { background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom: 25px; overflow: hidden; }
+  .header { background: #3f51b5; padding: 25px; text-align: center; }
+  h1 { color: white; font-weight: 600; font-size: 22px; margin: 0; }
+  .update-section { padding: 25px 30px; }
+  h2 { color: #2c3e50; font-size: 18px; margin-top: 0; margin-bottom: 18px; padding-bottom: 10px; border-bottom: 1px solid #eee; }
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; color: #7f8c8d; font-weight: 500; font-size: 13px; text-transform: uppercase; padding: 8px 10px; }
+  td { padding: 10px; border-bottom: 1px solid #f1f5f9; }
+  tr:last-child td { border-bottom: none; }
+  .package-name { color: #2c3e50; font-weight: 500; }
+  .version { font-family: "SFMono-Regular", Consolas, monospace; font-size: 13px; }
+  .current-version { color: #e74c3c; }
+  .new-version { color: #27ae60; font-weight: 500; }
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+  .badge-system { background: #e3f2fd; color: #1565c0; }
+  .badge-app { background: #e8f5e9; color: #2e7d32; }
+  .badge-critical { background: #ffebee; color: #c62828; }
+  .footer { text-align: center; padding: 20px; color: #95a5a6; font-size: 12px; }
+  .update-count { background: #4caf50; color: white; border-radius: 50%; width: 22px; height: 22px; display: inline-block; text-align: center; line-height: 22px; font-size: 12px; margin-left: 8px; }
+  .no-updates { color: #7f8c8d; font-style: italic; text-align: center; padding: 20px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="card">
+    <div class="header">
+      <h1>YunoHost Server Updates</h1>
+    </div>
+    
+    <div class="update-section">
+      <h2>System Packages'
+
+# System updates section
+if $SYSTEM_UPDATES; then
+    COUNT=$(jq '.system | length' <<<"$JSON")
+    HTML_HEADER+="<span class='update-count'>$COUNT</span>"
+fi
+
+HTML_HEADER+='</h2>'
+
+if $SYSTEM_UPDATES; then
+    HTML_SYSTEM='<table><tr><th>Package</th><th>Current Version</th><th>New Version</th></tr>'
+    while read -r row; do
+        name=$(jq -r '.name' <<<"$row")
+        current=$(jq -r '.current_version' <<<"$row")
+        new=$(jq -r '.new_version' <<<"$row")
+        HTML_SYSTEM+="<tr><td class='package-name'><span class='badge badge-system'>system</span> $name</td>"
+        HTML_SYSTEM+="<td class='version current-version'>$current</td>"
+        HTML_SYSTEM+="<td class='version new-version'>$new</td></tr>"
+    done < <(jq -c '.system[]' <<<"$JSON")
+    HTML_SYSTEM+='</table>'
+else
+    HTML_SYSTEM='<div class="no-updates">No system package updates available</div>'
+fi
+
+# Application updates section
+HTML_APPS='<div class="card"><div class="update-section"><h2>Applications'
+
+if $APP_UPDATES; then
+    COUNT=$(jq '[.apps[] | select(.upgradable == "yes")] | length' <<<"$JSON")
+    HTML_APPS+="<span class='update-count'>$COUNT</span>"
+fi
+
+HTML_APPS+='</h2>'
+
+if $APP_UPDATES; then
+    HTML_APPS+='<table><tr><th>Application</th><th>Domain</th><th>Current Version</th><th>New Version</th></tr>'
+    while read -r row; do
+        name=$(jq -r '.name' <<<"$row")
+        domain=$(jq -r '.domain_path' <<<"$row")
+        current=$(jq -r '.current_version' <<<"$row")
+        new=$(jq -r '.new_version' <<<"$row")
+        HTML_APPS+="<tr><td class='package-name'><span class='badge badge-app'>app</span> $name</td>"
+        HTML_APPS+="<td>$domain</td>"
+        HTML_APPS+="<td class='version current-version'>$current</td>"
+        HTML_APPS+="<td class='version new-version'>$new</td></tr>"
+    done < <(jq -c '.apps[] | select(.upgradable == "yes")' <<<"$JSON")
+    HTML_APPS+='</table>'
+else
+    HTML_APPS+='<div class="no-updates">No application updates available</div>'
+fi
+
+HTML_APPS+='</div></div>'
+
+# Critical update section
+HTML_CRITICAL=''
+if $YUNOHOST_UPDATE; then
+    HTML_CRITICAL='<div class="card"><div class="update-section"><h2><span class="badge badge-critical">Critical</span> YunoHost Core Update Available</h2><p>Important YunoHost system update is available. Please upgrade as soon as possible.</p></div></div>'
+fi
+
+# Footer
+HTML_FOOTER="<div class='footer'><p>Generated on $(date +'%Y-%m-%d %H:%M:%S')</p></div></div></body></html>"
+
+# Combine all HTML parts
+FULL_HTML="${HTML_HEADER}${HTML_SYSTEM}</div></div>${HTML_APPS}${HTML_CRITICAL}${HTML_FOOTER}"
+
+# Send email
+echo "$FULL_HTML" | mail -a "Content-Type: text/html" -s "$SUBJECT" "$RECIPIENT"
