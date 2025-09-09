@@ -1,0 +1,34 @@
+#!/bin/bash
+
+# Script to generate and send pflogsumm report for yesterday's mail activity
+# Requires pflogsumm to be installed: `sudo apt install pflogsumm -y`
+
+# Set variables
+LOG_FILE="/var/log/mail.log"
+REPORT_DATE=$(date -d "yesterday" +"%Y-%m-%d")
+SUBJECT="Postfix Mail Report for $REPORT_DATE"
+RECIPIENT="root"
+
+# Check if pflogsumm is installed
+if ! command -v pflogsumm &> /dev/null; then
+    echo "Error: pflogsumm is not installed. Please install it with: sudo apt-get install pflogsumm"
+    exit 1
+fi
+
+# Check if mail.log exists
+if [ ! -f "$LOG_FILE" ]; then
+    echo "Error: Log file $LOG_FILE does not exist."
+    exit 1
+fi
+
+# Generate the report for yesterday
+REPORT=$(pflogsumm -d yesterday "$LOG_FILE" 2>/dev/null)
+
+# Check if report was generated successfully
+if [ $? -ne 0 ] || [ -z "$REPORT" ]; then
+    echo "Error: Failed to generate report or no mail activity found for yesterday."
+    exit 1
+fi
+
+# Send the report via email
+echo "$REPORT" | mail -s "$SUBJECT" "$RECIPIENT"
