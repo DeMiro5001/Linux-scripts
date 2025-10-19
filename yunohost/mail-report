@@ -2,10 +2,12 @@
 
 # Script to generate and send pflogsumm report for yesterday's mail activity
 # Requires pflogsumm to be installed: `sudo apt install pflogsumm -y`
+# Place it in /etc/cron.daily and ensure it is executable (with `chmod +x mail-report`)
 
 # Set variables
 LOG_FILE="/var/log/mail.log"
 REPORT_DATE=$(date -d "yesterday" +"%Y-%m-%d")
+YESTERDAY_FORMAT=$(date -d "yesterday" +"%Y-%m-%d")
 SUBJECT="Postfix Mail Report for $REPORT_DATE"
 RECIPIENT="root"
 
@@ -22,7 +24,7 @@ if [ ! -f "$LOG_FILE" ]; then
 fi
 
 # Generate the report for yesterday
-REPORT=$(pflogsumm -d yesterday "$LOG_FILE" 2>/dev/null)
+REPORT=$(cat $LOG_FILE* | pflogsumm -d yesterday  2>/dev/null)
 
 # Check if report was generated successfully
 if [ $? -ne 0 ] || [ -z "$REPORT" ]; then
@@ -30,5 +32,79 @@ if [ $? -ne 0 ] || [ -z "$REPORT" ]; then
     exit 1
 fi
 
-# Send the report via email
-echo "$REPORT" | mail -s "$SUBJECT" "$RECIPIENT"
+# Get sender ownership errors count
+OWNERSHIP_ERRORS=$(grep "not owned by user" /var/log/mail.log | grep "$REPORT_DATE" | wc -l)
+
+# Get mail queue information
+QUEUE_COUNT=$(mailq | grep -c "^[A-F0-9]")
+if [ $QUEUE_COUNT -gt 0 ]; then
+    QUEUE_INFO=$(mailq | head -n 20 | grep -A 10 "^[A-F0-9]")
+else
+    QUEUE_INFO="No messages in queue"
+fi
+
+# Get failed authentication attempts
+FAILED_AUTH=$(grep "SASL.*authentication failed" /var/log/mail.log | grep "$YESTERDAY_FORMAT" | head -n 50)
+
+# Count total failed authentication attempts
+FAILED_AUTH_COUNT=$(grep "SASL.*authentication failed" /var/log/mail.log | grep "$YESTERDAY_FORMAT" | wc -l)
+
+# Get blocked connections (like Spamhaus blocks)
+BLOCKED_CONNECTIONS=$(grep "blocked using" /var/log/mail.log | grep "$YESTERDAY_FORMAT" | head -n 50)
+BLOCKED_COUNT=$(grep "blocked using" /var/log/mail.log | grep "$YESTERDAY_FORMAT" | wc -l)
+
+# Send the report via email with additional information
+{
+    echo "$REPORT"
+    echo ""
+    echo "=== ADDITIONAL INFORMATION ==="
+    echo "Sender ownership errors: $OWNERSHIP_ERRORS"
+    echo ""
+    echo "Current mail queue: $QUEUE_COUNT messages"
+    if [ $QUEUE_COUNT -gt 0 ]; then
+        echo "First few queue entries:"
+        echo "$QUEUE_INFO"
+    fi
+    echo ""
+    echo "=== FAILED AUTHENTICATION ATTEMPTS ==="
+    echo "Total failed authentication attempts: $FAILED_AUTH_COUNT"
+    if [ $FAILED_AUTH_COUNT -gt 0 ]; then
+        echo ""
+        echo "Recent failed authentication attempts:"
+        # Extract and format the relevant information
+        echo "$FAILED_AUTH" | while read line; do
+            # Extract timestamp
+            timestamp=$(echo "$line" | grep -oP '\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}')
+            # Extract IP address (handles both hostname[IP] and unknown[IP] formats)
+            ip=$(echo "$line" | grep -oP '(\S+\[|unknown\[)([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})' | grep -oP '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}')
+            # Extract username
+            username=$(echo "$line" | grep -oP 'sasl_username=\K[^,]+')
+            # Format the output
+            if [ ! -z "$timestamp" ] && [ ! -z "$ip" ] && [ ! -z "$username" ]; then
+                echo "$timestamp - IP: $ip - User: $username"
+            fi
+        done
+    else
+        echo "No failed authentication attempts found."
+    fi
+    echo ""
+    echo "=== BLOCKED CONNECTIONS ==="
+    echo "Total blocked connections: $BLOCKED_COUNT"
+    if [ $BLOCKED_COUNT -gt 0 ]; then
+        echo ""
+        echo "Recent blocked connections:"
+        echo "$BLOCKED_CONNECTIONS" | while read line; do
+            # Extract timestamp
+            timestamp=$(echo "$line" | grep -oP '\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}')
+            # Extract IP address
+            ip=$(echo "$line" | grep -oP 'from[^[]+\[([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})' | grep -oP '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}')
+            # Extract block reason
+            reason=$(echo "$line" | grep -oP 'blocked using \K[^;]+')
+            if [ ! -z "$timestamp" ] && [ ! -z "$ip" ] && [ ! -z "$reason" ]; then
+                echo "$timestamp - IP: $ip - Blocked by: $reason"
+            fi
+        done
+    else
+        echo "No blocked connections found."
+    fi
+} | mail -s "$SUBJECT" "$RECIPIENT"
