@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Script to generate and send pflogsumm report for yesterday's mail activity
-# Requires pflogsumm to be installed: `sudo apt install pflogsumm -y`
+# Requires pflogsumm and geoip-bin to be installed: `sudo apt install pflogsumm geoip-bin -y`
 # Place it in /etc/cron.daily and ensure it is executable (with `chmod +x mail-report`)
 
 # Set variables
@@ -10,6 +10,22 @@ REPORT_DATE=$(date -d "yesterday" +"%Y-%m-%d")
 YESTERDAY_FORMAT=$(date -d "yesterday" +"%Y-%m-%d")
 SUBJECT="Postfix Mail Report for $REPORT_DATE"
 RECIPIENT="root"
+
+# Function to get country from IP using geoiplookup
+get_country() {
+    local ip=$1
+    if command -v geoiplookup &> /dev/null; then
+        # Try to get country from IP
+        country=$(geoiplookup "$ip" 2>/dev/null | awk -F ': ' '{print $2}' | awk -F ',' '{print $1}')
+        if [[ -z "$country" || "$country" == "IP Address not found" ]]; then
+            echo "Unknown"
+        else
+            echo "$country"
+        fi
+    else
+        echo "Unknown (install geoip-bin)"
+    fi
+}
 
 # Check if pflogsumm is installed
 if ! command -v pflogsumm &> /dev/null; then
@@ -53,6 +69,44 @@ FAILED_AUTH_COUNT=$(grep "SASL.*authentication failed" /var/log/mail.log | grep 
 BLOCKED_CONNECTIONS=$(grep "blocked using" /var/log/mail.log | grep "$YESTERDAY_FORMAT" | head -n 50)
 BLOCKED_COUNT=$(grep "blocked using" /var/log/mail.log | grep "$YESTERDAY_FORMAT" | wc -l)
 
+# Extract IPs and usernames from failed authentication and count by country and username
+declare -A country_count
+declare -A username_count
+
+if [ $FAILED_AUTH_COUNT -gt 0 ]; then
+    # Count attempts per username
+    while read -r line; do
+        if [ -n "$line" ]; then
+            username=$(echo "$line" | grep -oP 'sasl_username=\K[^,]+')
+            if [ -n "$username" ]; then
+                ((username_count["$username"]++))
+            fi
+        fi
+    done <<< "$(grep "SASL.*authentication failed" /var/log/mail.log | grep "$YESTERDAY_FORMAT")"
+    
+    # Count attempts per country if geoiplookup is available
+    if command -v geoiplookup &> /dev/null; then
+        # Extract unique IPs from failed auth attempts
+        failed_ips=$(grep "SASL.*authentication failed" /var/log/mail.log | grep "$YESTERDAY_FORMAT" | grep -oP '(\S+\[|unknown\[)([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})' | grep -oP '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' | sort | uniq)
+        
+        # Count attempts per IP first
+        declare -A ip_count
+        while read -r ip; do
+            if [ -n "$ip" ]; then
+                count=$(grep "SASL.*authentication failed" /var/log/mail.log | grep "$YESTERDAY_FORMAT" | grep -c "$ip")
+                ip_count["$ip"]=$count
+            fi
+        done <<< "$failed_ips"
+        
+        # Then get countries and sum the counts
+        for ip in "${!ip_count[@]}"; do
+            country=$(get_country "$ip")
+            count=${ip_count["$ip"]}
+            ((country_count["$country"] += count))
+        done
+    fi
+fi
+
 # Send the report via email with additional information
 {
     echo "$REPORT"
@@ -68,6 +122,31 @@ BLOCKED_COUNT=$(grep "blocked using" /var/log/mail.log | grep "$YESTERDAY_FORMAT
     echo ""
     echo "=== FAILED AUTHENTICATION ATTEMPTS ==="
     echo "Total failed authentication attempts: $FAILED_AUTH_COUNT"
+    
+    # Display username counts if available
+    if [ ${#username_count[@]} -gt 0 ]; then
+        echo ""
+        echo "Failed attempts by username:"
+        # Sort usernames by count (descending)
+        for username in "${!username_count[@]}"; do
+            echo "${username_count[$username]} $username"
+        done | sort -nr
+    fi
+    
+    # Display country counts if available
+    if [ ${#country_count[@]} -gt 0 ]; then
+        echo ""
+        echo "Failed attempts by country:"
+        # Sort countries by count (descending)
+        for country in "${!country_count[@]}"; do
+            echo "${country_count[$country]} $country"
+        done | sort -nr
+    elif [ $FAILED_AUTH_COUNT -gt 0 ] && ! command -v geoiplookup &> /dev/null; then
+        echo ""
+        echo "Note: Install geoip-bin package for country analysis:"
+        echo "sudo apt-get install geoip-bin"
+    fi
+    
     if [ $FAILED_AUTH_COUNT -gt 0 ]; then
         echo ""
         echo "Recent failed authentication attempts:"
