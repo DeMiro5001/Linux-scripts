@@ -29,4 +29,6 @@ Some interesting hooks, fixes, additions, etc...
     files_mindmap
     sharepoint
     ```
-
+* [Block countries via nftables](https://github.com/DeMiro5001/Linux-scripts/blob/main/yunohost/block_countries_yunohost.md)
+* [Daily emails report](https://github.com/DeMiro5001/Linux-scripts/blob/main/yunohost/mail-report)
+* [Yunohost apps updates notification](https://github.com/DeMiro5001/Linux-scripts/blob/main/yunohost/yunohost-updates-notifier)
