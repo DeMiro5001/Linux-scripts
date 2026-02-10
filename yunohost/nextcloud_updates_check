@@ -10,7 +10,7 @@ install_dir="/var/www/$app"
 EMAIL_TO="root"
 SUBJECT="[YunoHost] Nextcloud Apps Health Report"
 
-# --- Global Info (Fetched Once) ---
+# --- Global Info ---
 # Get PHP version from YunoHost settings
 php_version=$(ynh_app_setting_get --app=$app --key=php_version)
 
@@ -30,15 +30,12 @@ check_incompatibility() {
     local target_major="$1"
 
     # 1. Installed Apps (Enabled only)
-    #echo "Listing installed NC apps"
     local list_installed=$(exec_occ app:list --output json | jq -r ".enabled | keys[]" | sort)
 
     # 2. Core Apps (Shipped with CURRENT version)
-    #echo "Getting core apps list"
     local list_core=$(curl -s "https://raw.githubusercontent.com/nextcloud/server/v$CURRENT_VER_STR/core/shipped.json" | jq -r '.shippedApps[]' | sort)
 
     # 3. Target Catalog (Apps compatible with TARGET version)
-    #echo "Getting apps list compatible with next version of NC"
     local list_target_catalog=$(curl -s "https://apps.nextcloud.com/api/v1/platform/$target_major.0.0/apps.json" | jq -r '.[] | .id' | sort)
 
     # Basic math : (Installed - Core) - Target_Catalog = Incompatible
@@ -48,7 +45,6 @@ check_incompatibility() {
 # --- Main Script ---
 
 # 1. Determine Target Version (Check YunoHost updates first, fallback to N+1)
-#echo "Checking for NC updates"
 YNH_UPDATE_JSON=$(yunohost tools update --json --quiet 2>/dev/null)
 # Extract new version for Nextcloud if available
 NEXT_VER_YNH=$(echo "$YNH_UPDATE_JSON" | jq -r ".apps[] | select(.id == \"$app\") | .upgrade.new_version // empty")
@@ -59,18 +55,14 @@ else
     TARGET_MAJOR=$((CURRENT_MAJOR + 1))
 fi
 
-# 2. Run Checks
-#echo "Checking available updates for NC apps"
+# 2. Run Checks : Checking available updates for NC apps
 INTERNAL_UPDATE_OUTPUT=$(exec_occ app:update --showonly 2>&1)
 
-#echo "Checking incompatible NC apps with next version of NC"
+# Checking incompatible NC apps with next version of NC
 INCOMPATIBLE_APPS=$(check_incompatibility "$TARGET_MAJOR")
 
-# 3. Notification Logic
+# 3. Notification
 TRIGGER_EMAIL=false
-
-#echo "Incompatible apps : $INCOMPATIBLE_APPS"
-#echo "Available updates : $INTERNAL_UPDATE_OUTPUT"
 
 # Trigger if text "new version available" is found OR if incompatible list is not empty
 echo "$INTERNAL_UPDATE_OUTPUT" | grep -q "new version available" && TRIGGER_EMAIL=true
