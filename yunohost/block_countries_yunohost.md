@@ -38,7 +38,7 @@ echo '}' >> /etc/nftables.d/11-geoip-ipv6.conf
 nano /etc/nftables.d/20-geoip-blocking.conf
 ```
 
-## Paste this and set the correct country codes
+## Paste this and set the correct country codes : set only the country codes you want to block. **This is an example**
 
 ```yaml
 table inet filter {
@@ -48,7 +48,7 @@ table inet filter {
         meta mark set ip6 saddr map @geoip6
 
         # Drop packets if mark matches one of the blocked countries
-        meta mark { $CN, $RU, $RO, $BR, $NL, $NG, $BD, $PH, $PK, $TH, $HK, $VN } drop
+        meta mark { $CN, $RU, $RO, $BR, $NG, $BD, $PH, $PK, $TH, $HK, $VN } drop
     }
 }
 ```
