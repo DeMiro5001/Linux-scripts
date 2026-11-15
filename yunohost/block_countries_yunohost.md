@@ -88,4 +88,17 @@ nft -f /etc/nftables.conf
 systemctl reload nftables
 ```
 
+## Undo
 
+```
+rm /etc/nftables.d/10-geoip-ipv4.conf
+rm /etc/nftables.d/11-geoip-ipv6.conf
+rm /etc/nftables.d/20-geoip-blocking.conf
+nft delete table geoip 2>/dev/null || true
+nft -f /etc/nftables.conf
+systemctl reload nftables
+```
+
+## Notes :
+- If cert renew fails, undo the blocking and retry
+- Do not block countries your server needs for functionning
